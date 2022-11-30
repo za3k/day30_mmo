@@ -13,7 +13,7 @@ load_info({
     "source_url": "https://github.com/za3k/day30_mmo",
     "subdir": "/hackaday/mmo",
     "description": "A relaxing coloring book mmo. It is nice.",
-    "instructions": "To play, you make an account. Then you can explore!",
+    "instructions": "",
     "login": True,
     "fullscreen": True,
 })
@@ -25,16 +25,10 @@ objects = DBDict("object")
 def index():
     return render_template('index.html')
 
-def play():
-    return render_template('index.html')
-
 @ajax("/ajax/store")
 def store(j):
-    value = j["value"]
-    if k["type"] in ["art"]
-        key = hash_id(json.dumps(value))
-    else:
-        key = k["id"] or random_id()
+    key = j["id"]
+    value = j
     objects[key] = value
     return {"key":key, "value": value}
 
@@ -42,6 +36,8 @@ def store(j):
 def get(json):
     key = json["key"]
     value = objects.get(key)
-    if value is None:
-        return "", 404
     return {"key": key, "value":value}
+
+@ajax("/ajax/getAllIds")
+def getAllIds(json):
+    return {"keys": list(objects.keys())}

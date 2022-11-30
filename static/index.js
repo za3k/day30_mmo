@@ -1,134 +1,42 @@
 'use strict';
 
 function debug(e) { $(".error").text(e || ""); }
+function scroll() { window.scrollTo(0, document.body.scrollHeight); }
+function deepcopy(o) { return JSON.parse(JSON.stringify(o)); }
 
-const fast = false; // Skip waits for development?
-const randomAdventure = true; // Non-random for develpment
-
-const random = {
-    int: function(min, max) { return Math.floor(Math.random()*(max-min+1))+min; },
-    choice: function(...things) { return things[random.int(0, things.length-1)]; }
-};
-function uppercase(x) { return x[0].toUpperCase() + x.slice(1) }
-function sleep(seconds) {
-    if (fast) return null;
-    return new Promise(resolve => {
-        setTimeout(resolve, seconds*1000);
-    });
-}
-function scroll() {
-    window.scrollTo(0, document.body.scrollHeight);
+const PRESETS = {
+    place: {
+        contents: [],
+    },
+    door: {
+        actions: {"move": "movePlayer"},
+    },
+    person: {
+    },
+    scenery: {
+    }
 }
 
-class Easel {
-    constructor(div) {
-        this.div = div;
-        this.jcanvas = div.find("canvas");
-        this.canvas = this.jcanvas[0];
-        this.done = div.find(".done");
-        this.clearBtn = div.find(".clear");
-        this.thing = div.find(".thing");
-        this.enabled = false;
-        this.canvas.height = this.jcanvas.width();
-        this.canvas.width = this.jcanvas.height();
-        this.clearBtn.on("click", this.clear.bind(this));
-    }
-    mouse(ev) {
-        const rect = this.canvas.getBoundingClientRect()
-        return { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
-    }
-    line(mouse1, mouse2) {
-        // assumes mouse (pixel) and canvas coordinates are the same, which they are here.
-        const c = this.canvas.getContext("2d");
-        c.beginPath();
-        c.lineWidth = 5;
-        c.moveTo(mouse1.x, mouse1.y);
-        c.lineTo(mouse2.x, mouse2.y);
-        c.stroke();
-    }
-    clear() {
-        const c = this.canvas.getContext("2d");
-        c.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-    enable() {
-        this.div.toggleClass("enabled", true);
-        scroll();
-        // Allow drawing
-        this.jcanvas.on("mousedown", (ev) => {
-            let mouse = this.mouse(ev);
-            this.line(mouse,mouse);
-            this.jcanvas.on("mousemove", (ev) => {
-                const newMouse = this.mouse(ev);
-                this.line(mouse, newMouse);
-                mouse = newMouse;
-            })
-            $(document).on("mouseup", (ev) => {
-                this.jcanvas.off("mousemove");
-                $(document).off("mouseup");
-                const finalMouse = this.mouse(ev);
-                this.line(mouse, finalMouse);
-            });
-        });
-    }
-    disable() {
-        this.div.toggleClass("enabled", false);
-        this.jcanvas.off("mousedown");
-        $(document).off("mouseup");
-        this.jcanvas.off("mousemove");
-    }
-    draw(thing) {
-        return new Promise((done) => {
-            this.thing.text(thing);
-            this.clear();
-            this.enable();
-            
-            this.done.on("click", () => {
-                this.done.off("click");
-                this.disable();
-                const data = this.canvas.toDataURL();
-                done(data);
-            });
-        });
-    }
-
+function splitId(id) {
+    const s = id.indexOf(' ');
+    const type = id.substring(0, s);
+    const name = id.substring(s+1);
+    return {type, name};
 }
 
-class Game {
-    //getDescriptionFor(thing) {}
-    constructor(div, easel, shared) {
-        this.div = div;
-        this.easel = easel;
-        this.link = div.find(".link")
-        this.seen = {}
-        this.ci = 0;
-        this.id = new URLSearchParams(window.location.search).get("shared"); // Load async
-        this.shared = {};
-        if (this.id) {
-            this.ready = this.ajax("/ajax/get", {key:this.id}).then(j => this.shared = j.value)
-        } else this.ready = null;
-
-        const game = this;
-        this.drawings = new Proxy({}, {
-            deleteProperty(target, thing) {
-                if(!!localStorage.getItem(this.slot(thing))) {
-                    localStorage.clearItem(this.slot(thing));
-                    return true;
-                }
-            },
-            get(target, thing) {
-                //if (thing in target) return target[thing]; // For stuff like this.drawings.length
-                return game.shared[thing] || localStorage.getItem(this.slot(thing));
-            },
-            set(target, thing, drawing) {
-                game.shared[thing] = drawing;
-                localStorage.setItem(this.slot(thing), drawing);
-                return true;
-            },
-            slot(thing) {
-                return `art-game debug-mode ${thing}`;
-            }
-        });
+class Set {
+    constructor() { this.l = {}; }
+    add(x) { this.l[x] = 1; }
+    get list() { return Object.keys(this.l); }
+}
+class Backend {
+    cache = {}
+    lists = {}
+    constructor() {
+        // Load all keys on game start
+        this.ajax("/ajax/getAllIds", {}).then(r => r.keys.forEach(this.see.bind(this)));
     }
+    getList(type) { return this.lists[type] = this.lists[type] || new Set(); }
     async ajax(url, data) {
         return new Promise(success => {
             $.ajax({
@@ -141,107 +49,183 @@ class Game {
             });
         })
     }
-    
-    choice(...args) {
-        this.ci++;
-        if (!!this.shared[this.ci]) return this.shared[this.ci];
-        return this.shared[this.ci] = randomAdventure ? random.choice(...args) : args[0];
+    listAll(type) { return this.lists[type].list }
+    see(id) {
+        const type = splitId(id).type;
+        this.getList(type).add(id);
     }
-    makeImage(data) {
-        return new Promise(resolve => {
-            const img = new Image();
-            img.src = data;
-            img.onload = () => {
-                resolve(img);
-            };
-        });
+    async save(thing) {
+        this.see(thing.id)
+        this.cache[thing.id] = thing;
+        await this.ajax("/ajax/store", thing);
     }
-    async text(words) {
-        // Make a text card
-        const narration = $(`<span class="text"><div class="cover"></div>${words}</span>`);
-        // Narrate aloud?
+    async get(id) {
+        this.see(id)
+        if (!this.cache[id]) {
+            this.cache[id] = (await this.ajax("/ajax/get", {key:id})).value;
+        }
+        const val = this.cache[id];
+        return val;
+    }
+}
 
-        await this.add(narration, 4);
+class UI {
+    constructor(div, game) {
+        this.div = div;
+        this.marker = div.find(".marker")
+        this.game = game;
+        const easel = new Easel(div.find(".easel"));
+        const chooser = new Chooser(div.find(".chooser"));
+
+        // Prompt methods
+        this.choice = chooser.choose.bind(chooser);
+        this.makeImage = easel.makeImage.bind(easel);
+        this.draw = easel.draw.bind(easel);
     }
-    async add(e, wait) {
-        this.easel.div.before(e); 
+    add(e) {
+        this.marker.before(e);
         scroll();
-        if (wait == 0) return;
-        await sleep(wait)
     }
-    async picture(thing) {
-        const nowait = !!this.seen[thing];
-        this.seen[thing] = 1;
-        let url;
-        if (this.drawings[thing]) url = this.shared[thing] = this.drawings[thing];
-        else if (this.shared[thing]) url = this.shared[thing];
-        else this.drawings[thing] = url = this.shared[thing] = await this.easel.draw(thing);
-        const image = await this.makeImage(url);
 
-        // Make a picture card
-        const picture = $(`<div class="picture"><div class="picture-label">${thing}</div></div>`);
-        const canvas = $('<canvas class="picture-image"></canvas>');
+    // UI methods
+    async displayThing(thing) { this.add(await this.thingCard(thing)); }
+    mention(text) { this.add(this.mentionCard(text)); }
+    clear() { this.marker.prevAll().remove(); }
+
+    // Template filler methods
+    mentionCard(text) {
+        return $(`<span class="mention">${text}</span>`);
+    }
+    async thingCard(thing) {
+        // Make the base card
+        const card = $(`<div class="thing ${thing.type}"><div class="type">${thing.type}</div><canvas class="thing-image"></canvas><div class="name">${thing.name}</div><div class="actions"></div></div>`);
+
+        // Draw the picture
+        const image = await this.makeImage(thing.pictureUrl);
+        const canvas = card.find("canvas");
         const context = canvas[0].getContext("2d");
         canvas[0].width = canvas[0].height = 200;
         context.drawImage(image, 0, 0, canvas[0].width, canvas[0].height)
-        picture.prepend(canvas);
 
-        await this.add(picture, !!nowait ? 0 : 2)
+        // Add and bind action buttons
+        const actions = card.find(".actions");
+        for (let [name, action] of Object.entries(thing.actions||{})) {
+            const actionE = $(`<input type="submit" class="action" value="${name}" />`);
+            actionE.on("click", () => { this.game.onAction(thing, action); });
+            actions.append(actionE);
+        }
+        return card;
     }
-    async makeLink() {
-        const url = new URL(window.location.href);
-        if (!this.id) this.id = (await this.ajax("/ajax/store", {value:this.shared})).key
-        url.searchParams.set("shared", this.id);
-        return url;
+}
+
+class Game {
+    constructor(div) {
+        this.backend = new Backend();
+        this.ui = new UI(div, this);
+        this.craftBtn = div.find(".craft")
+    }
+
+    async craft(thing = {}) {
+        this.craftBtn.hide();
+        if (!thing.type) thing.type = await this.ui.choice("I want to make a new:", ["scenery", "place", "door"], false);
+        else this.ui.mention(`You are making a new ${thing.type}.`);
+        thing = {
+            ...deepcopy(PRESETS[thing.type]),
+            ...thing,
+        }
+        if (!thing.name) thing.name = await this.ui.choice(`I'm making a ${thing.type} named:`, [], true)
+        else this.ui.mention(`Your ${thing.type} is named ${thing.name}`);
+        thing.id = `${thing.type} ${thing.name}`;
+
+        if (thing.type == "door") {
+            if (!thing.targetId) {
+                const targetName = await this.ui.choice(`When someone goes through ${thing.name}, they should end up in: `, this.backend.listAll("place").map((id) => splitId(id).name), true);
+                thing.targetId = `place ${targetName}`
+            } else this.ui.mention(`When someone goes from ${thing.name}, they will end up in ${thing.targetId}`);
+        }
+        thing.pictureUrl = await this.ui.draw(thing.name);
+
+        if (thing.type != "place") {
+            if (!thing.placeId) thing.placeId = this.player.placeId;
+            await this.create(thing, thing.placeId); // Saves
+        }
+
+        await this.backend.save(thing)
+        this.craftBtn.show();
+        return thing;
+    }
+    async create(thing, placeId) { // Saves
+        if (thing.placeId != placeId) debug("Thing created in wrong place");
+
+        // Display new objects locally immediately. Everyone else has to leave and come back
+        if (this.player && this.player.placeId == placeId && thing != this.player) {
+            this.ui.displayThing(thing);
+        }
+        const place = await this.backend.get(placeId);
+        if (place)  {
+            place.contents.push(thing.id);
+            await this.backend.save(place);
+        } else {
+            // Could make it on the fly
+            if (this.player) debug("Thing created in place that doesn't exist yet");
+        }
+        if (thing == this.player) this.playerArrived();
+        await this.backend.save(thing)
+    }
+    async move(thing, placeId) { // Saves
+        if (thing.placeId) {
+            // Remove code
+            const place = await this.backend.get(thing.placeId);
+            if (place) {
+                place.contents.splice(place.contents.indexOf(thing.id), 1); // remove thing
+                await this.backend.save(place);
+            }
+        }
+        thing.placeId = placeId;
+        await this.create(thing, placeId);
+    }
+
+    async craftMissing(id) {
+        return await this.craft(splitId(id)); // name, type
+    }
+    async playerArrived() {
+        let placeId = this.player.placeId;
+        this.place = await this.backend.get(placeId)
+        if (!this.place) {
+            this.place = await this.craftMissing(placeId);
+            this.create(this.player, placeId);
+        }
+        this.ui.clear();
+        this.ui.mention(`You are in ${this.place.name}.`);
+
+        await this.ui.displayThing(this.place);
+        this.ui.mention("Things here include: ");
+        for (let thingId of this.place.contents) {
+            const thing = await this.backend.get(thingId);
+            if (thing) {
+                await this.ui.displayThing(thing);
+            } else debug("Thing is here but not created");
+        }
+    }
+    async onAction(thing, action) {
+        if (action == "movePlayer") {
+            this.move(this.player, thing.targetId);
+            this.playerArrived();
+        }
+
     }
     async run() {
-        await this.ready;
-        const text = (t) => this.text(t);
-        const picture = (p) => this.picture(p);
-        const choice = (...args) => this.choice(...args);
+        const yourId = `person ${window.userId}`;
+        this.player = await this.backend.get(yourId) || await this.craft({type: "person", placeId: "place the first room", name: window.userId})
+        this.playerArrived();
 
-        const captive = choice("the prince", "the princess", "your cat", "a cool bug")
-         , companion = choice("your loyal steed", "your dog", "your unicorn", "your trusty companion", "your magic hat", "your secret crush", "your battle-clown")
-         , villain = choice("a dastardly villain", "an evil wizard", "a weird bug", "an evil witch")
-         , travel_method = choice("a long rope", "treacherous stairs", "a catapult", "a secret entrance", "a flying carpet")
-         , punishment = choice("had to make everyone pie", "went to jail", "was banished", "got boo-ed offstage", "stubbed their toe")
-         , guards = choice("a guard", "two guards", "three guards", "a video camera", "a sternly worded 'No Entry' sign")
-        const Captive = uppercase(captive), Companion = uppercase(companion);
-
-        await text("Once upon a time, there was a hero. It was you!")
-        await text("You arrived at the lonely castle.")
-        await picture("a lonely castle")
-        await text(`In the distance, a wolf howled. ${Companion} was unsettled.`)
-        await picture(`${companion}`)
-        await text(`You wanted to enter the castle. But at the front gate, you saw ${guards}.`)
-        await text(`You snuck by, while ${companion} created a distraction.`)
-         await picture(`${companion}`)
-        await picture(`${companion}'s distraction`)
-        await text(`You heard a call for help. ${Captive} was at the top of the tallest tower! You had to rescue them! You looked around for a way to get to the top of the tower.`)
-        await picture(`climbing the tower with ${travel_method}`)
-        await text(`At the top of the tower, you saw ${villain} holding ${captive} captive.`)
-        await picture(`${villain}`)
-        await picture(`${captive}`)
-        await text(`You set your feet, and prepared to defeat ${villain}.`)
-         await picture(`${villain}`)
-        await picture(`how your plan to defeat ${villain} went wrong`)
-        await picture(`how you actually defeated ${villain}`)
-        await text(`${Captive} was happy to see you, and gave you a reward.`)
-         await picture(`${captive}`)
-        await picture("your reward")
-        await text(`Everyone lived happily ever after, except ${villain}, who ${punishment}.`)
-        await text(`THE END`)
-
-        this.link.show();
-        const url = await this.makeLink();
-        window.location.searchParam = url.searchParam;
-        this.link.attr("href", url.toString());
+        // Wait for actions, then do stuff. All async.
+        this.craftBtn.on("click", () => this.craft());
     }
 }
 
 function main() {
-    let easel = new Easel($(".easel"));
-    let game = new Game($(".game"), easel);
+    let game = window.game = new Game($(".game"));
     game.run();
 }
 

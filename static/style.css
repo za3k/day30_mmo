@@ -11,67 +11,23 @@
 header, .content {
     margin-left: 40px !IMPORTANT;
 }
-/*
-Oops! This doesn't cooperate with 'reveal text'
-
-body {
-    background-image: url(image/paper.jpg);
-    background-repeat: repeat;
-}
-*/
-
-@keyframes cover {
-    0% {
-        background-color: rgb(255,255,255);
-        left: 0;
-        width: 100%;
-    }
-    to {
-        background-color: rgb(255,255,255);
-        left: 100%;
-        width: 0%;
-    }
-}
-@keyframes write {
-    from {
-        opacity: 0.1;
-    }
-    to {
-        opacity: 1;
-
-    }
-}
 
 .game > * {
     margin-bottom: 20px;
+    vertical-align: top;
 }
 
-.text {
+.mention {
     display: block;
     width: fit-content;
     position: relative;
-    font-size: 16pt;
+    font-size: 12pt;
     margin: 10px 0 20px 5px;
     font-style: italic;
     font-family: lucida;
-
-    animation: write 4s;
-}
-.text:first-letter {
-    font-size: 300%;
-}
-.text .cover {
-    display: block;
-    animation: cover 4s linear;
-    position:absolute;
-    z-index: 1;
-    height: 100%;
-    content: "";
 }
 
-
-
-.picture {
+.thing {
     border: 1px solid lightgrey;
     display: inline-block;
     margin-left: 5em;
@@ -79,11 +35,30 @@ body {
     border-radius: 20px;
     text-align: center;
     width: min-content;
-
-    animation: write 4s ease-in-out;
+    height: 300px
+}
+.thing canvas {
+    width: 200px;
+    height: 200px;
+}
+.thing .actions {
+    padding: 5px 0 5px 0;
+    /*height: 30px;*/
+}
+.place {
+    background-color: rgba(255, 0, 0, 0.02);
+}
+.person {
+    background-color: rgba(0, 255, 0, 0.02);
+}
+.door {
+    background-color: rgba(0, 0, 255, 0.02);
+}
+.scenery {
+    background-color: rgba(255, 255, 0, 0.02);
 }
 
-.easel:not(.enabled) {
+.easel:not(.enabled), .chooser:not(.enabled) {
     display: none;
 }
 
@@ -105,14 +80,8 @@ body {
     text-align: center;
 }
 
-.highlight {
-    cursor: move;
-    background-color: #fff;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.2);
-}
+.chooser {
 
-.link {
-    display: none;
 }
 
 /* -- All Hack-A-Day projects -- */

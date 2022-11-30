@@ -9,7 +9,7 @@
 </head>
 
 <body>
-<script>window.ajaxPrefix=window.wsPrefix="{{ subdir }}";{% if login %} window.loggedIn = {{ 0+current_user.is_authenticated }};{% endif %}</script>
+<script>window.ajaxPrefix=window.wsPrefix="{{ subdir }}";{% if login %} window.loggedIn = {{ 0+current_user.is_authenticated }};{% if current_user.is_authenticated %} window.userId = "{{current_user.id}}";{% endif %}{% endif %}</script>
 <div class="container">
 <nav class="navbar navbar-default">
     <div class="container-fluid">
