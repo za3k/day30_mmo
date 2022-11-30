@@ -127,7 +127,7 @@ class Game {
 
     async craft(thing = {}) {
         this.craftBtn.hide();
-        if (!thing.type) thing.type = await this.ui.choice("I want to make a new:", ["scenery", "place", "door"], false);
+        if (!thing.type) thing.type = await this.ui.choice("I want to make a new:", ["scenery", "door"], false);
         else this.ui.mention(`You are making a new ${thing.type}.`);
         thing = {
             ...deepcopy(PRESETS[thing.type]),
