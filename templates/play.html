@@ -1,0 +1,22 @@
+{% extends 'base2.html' %}
+
+{% block header %}
+    <h3>{% block title %}{{ project_name }}{% endblock %}</h3>
+    <script src="{{ url_for('static', filename='index.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="error"></div>
+<div class="game">
+    <div class="easel">
+        <canvas></canvas>
+        <div>Draw <span class="thing">one art</span></div>
+        <div class="hflex">
+            <input type="submit" class="btn btn-primary done" value="Done"></input>
+            <div></div>
+            <input type="submit" class="btn btn-primary clear" value="Clear"></input>
+        </div>
+    </div>
+    <a href="" class="link"><input class="btn btn-primary" value="Share Adventure"></a>
+</div>
+{% endblock %}
