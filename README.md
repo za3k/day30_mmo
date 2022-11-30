@@ -4,7 +4,7 @@ Hack-A-Day is a project I'm doing in November, where I try to make 30 new projec
 
 Day 30 is a collaborative art MMO.
 
-[![Screenshot](screenshot.gif)](https://tilde.za3k.com/hackaday/mmo)
+[![Screenshot](screenshot.png)](https://tilde.za3k.com/hackaday/mmo)
 
 Demo available [here](https://tilde.za3k.com/hackaday/mmo).
 
