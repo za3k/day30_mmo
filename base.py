@@ -95,8 +95,8 @@ def unauthorized_handler():
 
 @app.route("/dump")
 def dump():
-    #if not app.config["DEBUG"]:
-    #    return "Disabled in production", 404
+    if not app.config["DEBUG"]:
+        return "Disabled in production", 404
     global db_lists, db_dicts
     s = "<pre>"
     s+="DICTS = {}\n".format(repr(sorted(db_dicts)))
