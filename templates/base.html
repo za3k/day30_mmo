@@ -20,13 +20,6 @@
         <li><a href="{{ url_for('about') }}">About</a>
     </ul>
     {% if login %}
-        <ul class="nav navbar-nav navbar-right">
-            {% if current_user.is_authenticated %}
-                <li><a href="{{ url_for('logout') }}">Log Out ({{ current_user.id }})</a>
-            {% else %}
-                <li><a href="{{ url_for('login') }}">Log In / Register</a>
-            {% endif %}
-        </ul>
     {% endif %}
     {% block extras %}{% endblock %}
     </div>
